@@ -6,7 +6,8 @@ the number of entries found. If files are missing or cannot be read,
 it handles the error gracefully.
 """
 
-from flask import Flask
+from flask import Flask, render_template_string
+import folium
 import pandas as pd
 import os
 
@@ -26,10 +27,80 @@ def index():
         # Return a friendly error message instead of breaking
         return f"⚠️ London Cocktail Week 2025! {error_message}"
 
-    return (
-        f"London Cocktail Week 2025! "
-        f"Bars loaded: {bars_df.shape[0]}. "
-        f"Drinks loaded: {drinks_df.shape[0]}."
+    html_template = """
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <title>Bar Map</title>
+                <style>
+                    html, body {
+                        height: 100%;
+                        margin: 0;
+                        padding: 0;
+                        font-family: Arial, sans-serif;
+                    }
+                    
+                    body{
+                        display: flex;
+                        flex-direction: column;
+                        padding: 1rem;
+                        box-sizing: border-box;
+                    }
+
+                    h1 {
+                        text-align: center;
+                        margin: 0 0 1rem 0;
+                        flex-shrink: 0; 
+                    }
+
+                    .map-container {
+                        flex: 1;
+                        width: 100%;
+                        max-width: 100%;
+                        overflow: hidden;
+                        position: relative;
+                        display: flex;
+                    }
+                    
+                    .map-container iframe {
+                        flex: 1;
+                        border: 1px solid #ccc;
+                        border-radius: 8px;
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>London Cocktail Week 2025!</h1>
+                <div class="map-container">
+                    {{ map_html|safe }}
+                </div>
+            </body>
+        </html>
+    """
+
+    df = bars_df.copy()
+
+    if not df.empty:
+        map_center = [df['Latitude'].mean(), df['Longitude'].mean()]
+    else:
+        map_center = [df['Latitude'].mean(), df['Longitude'].mean()]
+
+    bar_map = folium.Map(location=map_center, zoom_start=13, tiles="cartodb positron")
+
+    for idx, row in df.iterrows():
+        popup_html = f"""
+            <b>{row['Bar Name']}</b><br>
+        """
+
+        folium.Marker(
+            location=[row['Latitude'], row['Longitude']],
+            popup=popup_html,
+            icon=folium.Icon()
+        ).add_to(bar_map)
+
+    return render_template_string(
+        html_template,
+        map_html=bar_map._repr_html_()
     )
 
 def load_data():
