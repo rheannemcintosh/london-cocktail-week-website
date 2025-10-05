@@ -6,7 +6,7 @@ the number of entries found. If files are missing or cannot be read,
 it handles the error gracefully.
 """
 
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, request
 import folium
 import pandas as pd
 import os
@@ -103,10 +103,23 @@ def index():
                         border: 1px solid #ccc;
                         border-radius: 8px;
                     }
+                    
+                    .search-box {
+                        padding: 0 0 1rem 0;
+                    }
                 </style>
             </head>
             <body>
                 <h1>London Cocktail Week 2025!</h1>
+                    <div class="search-box">
+                        <form method="GET">
+                            <input type="text" name="query" placeholder="Search bar name" value="{{ query }}">
+                            <button type="submit">Search</button>
+                            <a href="/" style="text-decoration:none;">
+                                <button type="button">Reset</button>
+                            </a>
+                        </form>
+                    </div>
                 <div class="map-container">
                     {{ map_html|safe }}
                 </div>
@@ -114,7 +127,13 @@ def index():
         </html>
     """
 
+    query = request.args.get("query", "").strip().lower()
+
     df = bars_df.copy()
+
+    # Apply name filter
+    if query:
+        df = df[df["Bar Name"].str.lower().str.contains(query)]
 
     if not df.empty:
         map_center = [df['Latitude'].mean(), df['Longitude'].mean()]
