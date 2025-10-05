@@ -114,6 +114,13 @@ def index():
                     <div class="search-box">
                         <form method="GET">
                             <input type="text" name="query" placeholder="Search bar name" value="{{ query }}">
+                            <select name="preference">
+                                <option value="" {% if preference == '' %}selected{% endif %}>All Preferences</option>
+                                <option value="r" {% if preference == 'r' %}selected{% endif %}>R Preference</option>
+                                <option value="f" {% if preference == 'f' %}selected{% endif %}>F Preference</option>
+                                <option value="both" {% if preference == 'both' %}selected{% endif %}>Both</option>
+                                <option value="none" {% if preference == 'none' %}selected{% endif %}>None</option>
+                            </select>
                             <button type="submit">Search</button>
                             <a href="/" style="text-decoration:none;">
                                 <button type="button">Reset</button>
@@ -128,34 +135,66 @@ def index():
     """
 
     query = request.args.get("query", "").strip().lower()
+    preference = request.args.get('preference', '')
 
-    df = bars_df.copy()
+    filtered_df = bars_df.copy()
 
-    # Apply name filter
     if query:
-        df = df[df["Bar Name"].str.lower().str.contains(query)]
+        filtered_df = filtered_df[filtered_df['Bar Name'].str.contains(query, case=False, na=False)]
 
-    if not df.empty:
-        map_center = [df['Latitude'].mean(), df['Longitude'].mean()]
+    # Filter by preference
+    if preference == 'r':
+        filtered_df = filtered_df[filtered_df['R_Preference'] == True]
+    elif preference == 'f':
+        filtered_df = filtered_df[filtered_df['F_Preference'] == True]
+    elif preference == 'both':
+        filtered_df = filtered_df[(filtered_df['R_Preference'] == True) & (filtered_df['F_Preference'] == True)]
+    elif preference == 'none':
+        filtered_df = filtered_df[(filtered_df['R_Preference'] == False) & (filtered_df['F_Preference'] == False)]
+
+    if not filtered_df.empty:
+        map_center = [filtered_df['Latitude'].mean(), filtered_df['Longitude'].mean()]
     else:
-        map_center = [df['Latitude'].mean(), df['Longitude'].mean()]
+        map_center = [filtered_df['Latitude'].mean(), filtered_df['Longitude'].mean()]
 
     bar_map = folium.Map(location=map_center, zoom_start=13, tiles="cartodb positron")
 
-    for idx, row in df.iterrows():
+    for idx, row in filtered_df.iterrows():
+
         popup_html = f"""
             <b>{row['Bar Name']}</b><br>
             <a href="/bar/{idx}" target="_blank">View details</a>
         """
 
+        r_preference = row['R_Preference']
+        f_preference = row['F_Preference']
+
+        if r_preference & f_preference:
+            colour = 'red'
+            icon = 'star'
+        elif r_preference and not f_preference:
+            colour = 'orange'
+            icon = 'lemon'
+        elif f_preference and not r_preference:
+            colour = 'green'
+            icon = 'cat'
+        else:
+            colour = 'lightgray'
+            icon = 'face-frown'
+
         folium.Marker(
             location=[row['Latitude'], row['Longitude']],
             popup=popup_html,
-            icon=folium.Icon()
+            icon=folium.Icon(
+                color=colour,
+                icon=icon,
+                prefix='fa'
+            )
         ).add_to(bar_map)
 
     return render_template_string(
         html_template,
+        query=query, preference=preference,
         map_html=bar_map._repr_html_()
     )
 
