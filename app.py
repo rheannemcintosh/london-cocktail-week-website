@@ -13,6 +13,43 @@ import os
 
 app = Flask(__name__)
 
+def load_data():
+    """
+    Load bar and drink data from CSV files safely.
+
+    Returns:
+        tuple:
+            pd.DataFrame: The bar data (empty if load failed).
+            pd.DataFrame: The drink data (empty if load failed).
+            str: Error message if files are missing or unreadable.
+    """
+    bars_file = 'data/bars.csv'
+    drinks_file = 'data/drinks.csv'
+
+    bars_df = pd.DataFrame()
+    drinks_df = pd.DataFrame()
+
+    try:
+        if not os.path.exists(bars_file):
+            raise FileNotFoundError(f"File not found: {bars_file}")
+        if not os.path.exists(drinks_file):
+            raise FileNotFoundError(f"File not found: {drinks_file}")
+
+        bars_df = pd.read_csv(bars_file)
+        drinks_df = pd.read_csv(drinks_file)
+
+        return bars_df, drinks_df, None
+
+    except FileNotFoundError as e:
+        return bars_df, drinks_df, f"Missing data file — {e}"
+    except pd.errors.EmptyDataError as e:
+        return bars_df, drinks_df, f"Data file is empty — {e}"
+    except Exception as e:
+        return bars_df, drinks_df, f"Unexpected error loading data — {e}"
+
+
+bars_df, drinks_df, error_message = load_data()
+
 @app.route('/')
 def index():
     """
@@ -21,7 +58,6 @@ def index():
     Returns:
         str: Application title with data loading summary.
     """
-    bars_df, drinks_df, error_message = load_data()
 
     if error_message:
         # Return a friendly error message instead of breaking
@@ -90,6 +126,7 @@ def index():
     for idx, row in df.iterrows():
         popup_html = f"""
             <b>{row['Bar Name']}</b><br>
+            <a href="/bar/{idx}" target="_blank">View details</a>
         """
 
         folium.Marker(
@@ -103,39 +140,83 @@ def index():
         map_html=bar_map._repr_html_()
     )
 
-def load_data():
+@app.route('/bar/<int:bar_id>')
+def bar_details(bar_id):
+    if bar_id not in bars_df.index:
+        return "<h2>Bar not found</h2>", 404
+
+    bar = bars_df.loc[bar_id]
+
+    return f"""
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <title>{bar['Bar Name']} - Details</title>
+                <style>
+                    body {{
+                        font-family: Arial, sans-serif;
+                        background: #f4f4f9;
+                        margin: 0;
+                        padding: 0;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
+                    }}
+                    .card {{
+                        background: #fff;
+                        padding: 20px 30px;
+                        border-radius: 12px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                        max-width: 400px;
+                        width: 100%;
+                    }}
+                    .card h1 {{
+                        margin-top: 0;
+                        font-size: 24px;
+                        color: #333;
+                    }}
+                    .card p {{
+                        font-size: 16px;
+                        color: #555;
+                        margin: 8px 0;
+                    }}
+                    .card a {{
+                        display: inline-block;
+                        margin-top: 15px;
+                        padding: 8px 16px;
+                        background: #007BFF;
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 6px;
+                        font-size: 14px;
+                    }}
+                    .card a:hover {{
+                        background: #0056b3;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>{bar['Bar Name']}</h1>
+                    <p><b>Address:</b> {bar['Address']}</p>
+                    <p><b>Phone Number:</b> {bar['Phone Number']}</p>
+                    <p><b>Description:</b> {bar['Description']}</p>
+                    <p><b>Neighbourhood:</b> {bar['Neighbourhood']}</p>
+                    <p><b>District:</b> {bar['City District']}</p>
+                    <h2>Opening Hours</h2>
+                    <p><b>MON:</b> {bar['MON']}</p>
+                    <p><b>TUE:</b> {bar['TUE']}</p>
+                    <p><b>WED:</b> {bar['WED']}</p>
+                    <p><b>THU:</b> {bar['THU']}</p>
+                    <p><b>FRI:</b> {bar['FRI']}</p>
+                    <p><b>SAT:</b> {bar['SAT']}</p>
+                    <p><b>SUN:</b> {bar['SUN']}</p>
+                    <a href="/">⬅ Back to map</a>
+                </div>
+            </body>
+        </html>
     """
-    Load bar and drink data from CSV files safely.
-
-    Returns:
-        tuple:
-            pd.DataFrame: The bar data (empty if load failed).
-            pd.DataFrame: The drink data (empty if load failed).
-            str: Error message if files are missing or unreadable.
-    """
-    bars_file = 'data/bars.csv'
-    drinks_file = 'data/drinks.csv'
-
-    bars_df = pd.DataFrame()
-    drinks_df = pd.DataFrame()
-
-    try:
-        if not os.path.exists(bars_file):
-            raise FileNotFoundError(f"File not found: {bars_file}")
-        if not os.path.exists(drinks_file):
-            raise FileNotFoundError(f"File not found: {drinks_file}")
-
-        bars_df = pd.read_csv(bars_file)
-        drinks_df = pd.read_csv(drinks_file)
-
-        return bars_df, drinks_df, None
-
-    except FileNotFoundError as e:
-        return bars_df, drinks_df, f"Missing data file — {e}"
-    except pd.errors.EmptyDataError as e:
-        return bars_df, drinks_df, f"Data file is empty — {e}"
-    except Exception as e:
-        return bars_df, drinks_df, f"Unexpected error loading data — {e}"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=True)
