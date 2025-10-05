@@ -13,6 +13,43 @@ import os
 
 app = Flask(__name__)
 
+def load_data():
+    """
+    Load bar and drink data from CSV files safely.
+
+    Returns:
+        tuple:
+            pd.DataFrame: The bar data (empty if load failed).
+            pd.DataFrame: The drink data (empty if load failed).
+            str: Error message if files are missing or unreadable.
+    """
+    bars_file = 'data/bars.csv'
+    drinks_file = 'data/drinks.csv'
+
+    bars_df = pd.DataFrame()
+    drinks_df = pd.DataFrame()
+
+    try:
+        if not os.path.exists(bars_file):
+            raise FileNotFoundError(f"File not found: {bars_file}")
+        if not os.path.exists(drinks_file):
+            raise FileNotFoundError(f"File not found: {drinks_file}")
+
+        bars_df = pd.read_csv(bars_file)
+        drinks_df = pd.read_csv(drinks_file)
+
+        return bars_df, drinks_df, None
+
+    except FileNotFoundError as e:
+        return bars_df, drinks_df, f"Missing data file — {e}"
+    except pd.errors.EmptyDataError as e:
+        return bars_df, drinks_df, f"Data file is empty — {e}"
+    except Exception as e:
+        return bars_df, drinks_df, f"Unexpected error loading data — {e}"
+
+
+bars_df, drinks_df, error_message = load_data()
+
 @app.route('/')
 def index():
     """
@@ -21,7 +58,6 @@ def index():
     Returns:
         str: Application title with data loading summary.
     """
-    bars_df, drinks_df, error_message = load_data()
 
     if error_message:
         # Return a friendly error message instead of breaking
@@ -103,39 +139,8 @@ def index():
         map_html=bar_map._repr_html_()
     )
 
-def load_data():
-    """
-    Load bar and drink data from CSV files safely.
 
-    Returns:
-        tuple:
-            pd.DataFrame: The bar data (empty if load failed).
-            pd.DataFrame: The drink data (empty if load failed).
-            str: Error message if files are missing or unreadable.
-    """
-    bars_file = 'data/bars.csv'
-    drinks_file = 'data/drinks.csv'
 
-    bars_df = pd.DataFrame()
-    drinks_df = pd.DataFrame()
-
-    try:
-        if not os.path.exists(bars_file):
-            raise FileNotFoundError(f"File not found: {bars_file}")
-        if not os.path.exists(drinks_file):
-            raise FileNotFoundError(f"File not found: {drinks_file}")
-
-        bars_df = pd.read_csv(bars_file)
-        drinks_df = pd.read_csv(drinks_file)
-
-        return bars_df, drinks_df, None
-
-    except FileNotFoundError as e:
-        return bars_df, drinks_df, f"Missing data file — {e}"
-    except pd.errors.EmptyDataError as e:
-        return bars_df, drinks_df, f"Data file is empty — {e}"
-    except Exception as e:
-        return bars_df, drinks_df, f"Unexpected error loading data — {e}"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=True)
